@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Media.Imaging;
 using Windows.Media.Editing;
 using Windows.Storage;
@@ -14,88 +14,111 @@ namespace WpfVideoTest
 {
 	public static class VideoManager
 	{
-		public static Task<BitmapImage> GetThumbnailAsync(TimeSpan timeOfFrame, string? sourceFilePath)
+		/// <summary>
+		/// Gets the snapshot image at a specified time from start of playback.
+		/// </summary>
+		/// <param name="filePath">File path of video file</param>
+		/// <param name="timeFromStart">Time from start of playback</param>
+		/// <returns>BitmapImage</returns>
+		public static Task<BitmapImage> GetSnapshotImageAsync(string? filePath, TimeSpan timeFromStart)
 		{
-			return GetThumbnailAsync(timeOfFrame, sourceFilePath, null, 0, 0, 0);
+			return GetSnapshotImageAsync(filePath, timeFromStart, new Size(0, 0));
 		}
 
-		public static Task<BitmapImage> GetThumbnailAsync(TimeSpan timeOfFrame, string? sourceFilePath, double width = 0, double height = 0)
+		/// <summary>
+		/// Gets the snapshot image at a specified time from start of playback.
+		/// </summary>
+		/// <param name="filePath">File path of video file</param>
+		/// <param name="timeFromStart">Time from start of playback</param>
+		/// <param name="targetSize">Target size of image</param>
+		/// <returns>BitmapImage</returns>
+		public static async Task<BitmapImage> GetSnapshotImageAsync(string? filePath, TimeSpan timeFromStart, Size targetSize)
 		{
-			return GetThumbnailAsync(timeOfFrame, sourceFilePath, null, 0, width, height);
-		}
+			if (string.IsNullOrEmpty(filePath))
+				throw new ArgumentNullException(nameof(filePath));
 
-		public static async Task<BitmapImage> GetThumbnailAsync(TimeSpan timeOfFrame, string? sourceFilePath, string? savedFilePath, int qualityLevel = 0, double width = 0, double height = 0)
-		{
-			if (string.IsNullOrEmpty(sourceFilePath))
-				throw new ArgumentNullException(nameof(sourceFilePath));
-			if (timeOfFrame < TimeSpan.Zero)
-				throw new ArgumentOutOfRangeException(nameof(timeOfFrame));
+			if (timeFromStart < TimeSpan.Zero)
+				throw new ArgumentOutOfRangeException(nameof(timeFromStart));
 
-			var (stream, actualWidth, actualHeight) = await GetThumbnailStreamAsync(sourceFilePath, timeOfFrame);
+			var (stream, actualWidth, actualHeight) = await GetSnapshotStreamAsync(filePath, timeFromStart).ConfigureAwait(false);
 
-			var ratio = Math.Min(width / actualWidth, height / actualHeight);
+			var ratio = Math.Min(targetSize.Width / actualWidth, targetSize.Height / actualHeight);
 			if (ratio > 0)
 			{
 				(actualWidth, actualHeight) = ((int)(actualWidth * ratio), (int)(actualHeight * ratio));
 			}
 
-			var bitmapImage = ConvertStreamToBitmapImage(stream, actualWidth, actualHeight);
+			return ConvertStreamToBitmapImage(stream, actualWidth, actualHeight);
+		}
 
-			await (!string.IsNullOrWhiteSpace(savedFilePath)
-				? Task.Run(() => SaveBitmapSourceToFile(bitmapImage, savedFilePath, qualityLevel))
-				: Task.CompletedTask);
+		/// <summary>
+		/// Gets the byte array of snapshot image at a specified time from start of playback.
+		/// </summary>
+		/// <param name="filePath">File path of video file</param>
+		/// <param name="timeFromStart">Time from start of playback</param>
+		/// <param name="qualityLevel">Quality level of snapshot image in JPEG format</param>
+		/// <returns>Byte array</returns>		
+		public static async Task<byte[]> GetSnapshotBytesAsync(string filePath, TimeSpan timeFromStart, int qualityLevel = 0)
+		{
+			if (string.IsNullOrEmpty(filePath))
+				throw new ArgumentNullException(nameof(filePath));
 
-			return bitmapImage;
+			if (timeFromStart < TimeSpan.Zero)
+				throw new ArgumentOutOfRangeException(nameof(timeFromStart));
+
+			var (stream, _, _) = await GetSnapshotStreamAsync(filePath, timeFromStart).ConfigureAwait(false);
+
+			return ConvertStreamToBytes(stream, qualityLevel);
 		}
 
 		private static async Task<(Stream stream, int width, int height)> GetThumbnailStreamAsync(string filePath)
 		{
 			var videoFile = await StorageFile.GetFileFromPathAsync(filePath);
 
-			const string frameWidthName = "System.Video.FrameWidth";
-			const string frameHeightName = "System.Video.FrameHeight";
+			var (width, height) = await GetResolutionAsync(videoFile);
 
-			// Get video resolution.
-			var frameProperties = await videoFile.Properties.RetrievePropertiesAsync(new[] { frameWidthName, frameHeightName });
-			uint frameWidth = (uint)frameProperties[frameWidthName];
-			uint frameHeight = (uint)frameProperties[frameHeightName];
+			// Get the thumbnail. The time from start of playback varies depending on each video file.
+			var thumbnail = await videoFile.GetThumbnailAsync(ThumbnailMode.VideosView);
 
-			var thumbnail = await videoFile.GetThumbnailAsync(ThumbnailMode.VideosView); // This will return the thumbnail around 1 second passed.
-
-			return (thumbnail.AsStream(), (int)frameWidth, (int)frameHeight);
+			return (thumbnail.AsStream(), width, height);
 		}
 
-		private static async Task<(Stream stream, int width, int height)> GetThumbnailStreamAsync(string filePath, TimeSpan timeOfFrame)
+		private static async Task<(Stream stream, int width, int height)> GetSnapshotStreamAsync(string filePath, TimeSpan timeFromStart)
 		{
 			var videoFile = await StorageFile.GetFileFromPathAsync(filePath);
 
-			const string frameWidthName = "System.Video.FrameWidth";
-			const string frameHeightName = "System.Video.FrameHeight";
-
-			// Get video resolution.
-			var frameProperties = await videoFile.Properties.RetrievePropertiesAsync(new[] { frameWidthName, frameHeightName });
-			uint frameWidth = (uint)frameProperties[frameWidthName];
-			uint frameHeight = (uint)frameProperties[frameHeightName];
+			var (width, height) = await GetResolutionAsync(videoFile);
 
 			// Use Windows.Media.Editing to get ImageStream.
 			var clip = await MediaClip.CreateFromFileAsync(videoFile);
 			var composition = new MediaComposition();
 			composition.Clips.Add(clip);
 
-			// Prevent time from passing the end of timeline.
-			var timeOfEnd = composition.Duration - TimeSpan.FromMilliseconds(1);
-			if (timeOfFrame > timeOfEnd)
-				timeOfFrame = timeOfEnd;
+			// Prevent time from passing end of playback.
+			var timeEnd = composition.Duration - TimeSpan.FromMilliseconds(1);
+			if (timeFromStart > timeEnd)
+				timeFromStart = timeEnd;
 
-			var imageStream = await composition.GetThumbnailAsync(timeOfFrame, (int)frameWidth, (int)frameHeight, VideoFramePrecision.NearestFrame);
+			var imageStream = await composition.GetThumbnailAsync(timeFromStart, width, height, VideoFramePrecision.NearestFrame);
 
-			return (imageStream.AsStream(), (int)frameWidth, (int)frameHeight);
+			return (imageStream.AsStream(), width, height);
+		}
+
+		private static async Task<(int width, int height)> GetResolutionAsync(StorageFile videoFile)
+		{
+			const string frameWidthName = "System.Video.FrameWidth";
+			const string frameHeightName = "System.Video.FrameHeight";
+
+			// Get video resolution.
+			var frameProperties = await videoFile.Properties.RetrievePropertiesAsync(new[] { frameWidthName, frameHeightName });
+			uint frameWidth = (uint)frameProperties[frameWidthName];
+			uint frameHeight = (uint)frameProperties[frameHeightName];
+
+			return ((int)frameWidth, (int)frameHeight);
 		}
 
 		private static BitmapImage ConvertStreamToBitmapImage(Stream stream, int width, int height)
 		{
-			Debug.WriteLine($"{width}-{height}");
-
 			if (0 < stream.Position)
 				stream.Seek(0, SeekOrigin.Begin);
 
@@ -106,22 +129,26 @@ namespace WpfVideoTest
 			image.DecodePixelWidth = width;
 			image.DecodePixelHeight = height;
 			image.EndInit();
-			image.Freeze(); // This is necessary for other thread to use the image.
+			image.Freeze();
 
 			return image;
 		}
 
-		private static void SaveBitmapSourceToFile(BitmapSource source, string filePath, int qualityLevel = 0)
+		private static byte[] ConvertStreamToBytes(Stream stream, int qualityLevel = 0)
 		{
+			if (0 < stream.Position)
+				stream.Seek(0, SeekOrigin.Begin);
+
 			var encoder = new JpegBitmapEncoder();
 
 			if (qualityLevel > 0)
 				encoder.QualityLevel = qualityLevel;
 
-			encoder.Frames.Add(BitmapFrame.Create(source));
+			encoder.Frames.Add(BitmapFrame.Create(stream));
 
-			using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
-			encoder.Save(fileStream);
+			using var ms = new MemoryStream();
+			encoder.Save(ms);
+			return ms.ToArray();
 		}
 
 		private static void SaveStreamToFile(Stream stream, string filePath, int qualityLevel = 0)
