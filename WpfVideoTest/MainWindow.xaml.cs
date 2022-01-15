@@ -43,29 +43,23 @@ namespace WpfVideoTest
 			}
 		}
 
-		private async Task SetFile(string sourceFilePath)
+		private async Task SetFile(string filePath)
 		{
-			string savedFilePath = Path.Combine(
-				Path.GetDirectoryName(sourceFilePath) ?? string.Empty,
-				$"{Path.GetFileNameWithoutExtension(sourceFilePath)}.jpg");
+			var dpi = VisualTreeHelper.GetDpi(TargetThumbnailImage);
+			var size = new Size(
+				TargetThumbnailImage.Width * dpi.DpiScaleX,
+				TargetThumbnailImage.Height * dpi.DpiScaleY);
 
-			var dpi = VisualTreeHelper.GetDpi(TargetImage);
-
-			Debug.WriteLine($"{TargetImage.Width * dpi.DpiScaleX}-{TargetImage.Height * dpi.DpiScaleY}");
-
-			TargetImage.Source = await VideoManager.GetThumbnailAsync(
+			TargetThumbnailImage.Source = await VideoManager.GetSnapshotImageAsync(
+				filePath,
 				TimeSpan.Zero,
-				sourceFilePath,
-				savedFilePath,
-				0,
-				TargetImage.Width * dpi.DpiScaleX,
-				TargetImage.Height * dpi.DpiScaleY);
+				size);
 
-			TargetMedia.LoadedBehavior = MediaState.Manual;
-			TargetMedia.ScrubbingEnabled = true;
-			TargetMedia.Source = new Uri(sourceFilePath, UriKind.RelativeOrAbsolute);
-			TargetMedia.Position = TimeSpan.Zero;
-			TargetMedia.Pause();
+			TargetPreviewImage.Source = await VideoManager.GetSnapshotImageAsync(
+				filePath,
+				TimeSpan.Zero);
+
+			TargetVideoBox.SourcePath = filePath;
 		}
 	}
 }
