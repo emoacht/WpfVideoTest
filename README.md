@@ -1,6 +1,8 @@
 ﻿# WPF Video Test
 
-Test creating the thumbnail of video file by [Windows.Media.Editing](https://docs.microsoft.com/en-us/uwp/api/windows.media.editing) on WPF.
+Test creating the snapshot of video file by [Windows.Media.Editing](https://docs.microsoft.com/en-us/uwp/api/windows.media.editing) on WPF.
+
+![Sceenshot](Images/VideoBox.png)
 
 ## Requirements
 
