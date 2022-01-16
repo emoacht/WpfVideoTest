@@ -119,14 +119,10 @@
 						  StrokeThickness="0"
 						  Fill="{Binding RelativeSource={RelativeSource AncestorType={x:Type Button}}, Path=Foreground}">
 						<Path.Data>
-							<CombinedGeometry>
-								<CombinedGeometry.Geometry1>
-									<RectangleGeometry Rect="0,0,4,12"/>
-								</CombinedGeometry.Geometry1>
-								<CombinedGeometry.Geometry2>
-									<RectangleGeometry Rect="8,0,4,12"/>
-								</CombinedGeometry.Geometry2>
-							</CombinedGeometry>
+							<GeometryGroup>
+								<RectangleGeometry Rect="0,0,4,12"/>
+								<RectangleGeometry Rect="8,0,4,12"/>
+							</GeometryGroup>
 						</Path.Data>
 					</Path>
 				</Button>
