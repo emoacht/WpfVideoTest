@@ -21,6 +21,8 @@ namespace WpfVideoTest
 		public MainWindow()
 		{
 			InitializeComponent();
+
+			this.ThumbnailGrid.Background = StripeBrush.Create(Brushes.Silver, Brushes.Gray);
 		}
 
 		private async void Browse_Click(object sender, RoutedEventArgs e)

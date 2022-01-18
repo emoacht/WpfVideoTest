@@ -5,15 +5,49 @@
 		xmlns:local="clr-namespace:WpfVideoTest"
 		Title="WPF Video Test"
 		Width="600" Height="300" SizeToContent="Height">
+	<Window.Resources>
+		<DrawingBrush x:Key="StripeBrush"
+					  Stretch="UniformToFill" TileMode="Tile"
+					  Viewport="0,0,40,48" ViewportUnits="Absolute">
+			<DrawingBrush.Drawing>
+				<DrawingGroup>
+					<DrawingGroup.Children>
+						<GeometryDrawing Brush="Yellow">
+							<GeometryDrawing.Geometry>
+								<RectangleGeometry Rect="0,0,10,12"/>
+							</GeometryDrawing.Geometry>
+						</GeometryDrawing>
+						<GeometryDrawing Brush="Black">
+							<GeometryDrawing.Geometry>
+								<PathGeometry>
+									<PathFigure StartPoint="0,0" IsClosed="True">
+										<LineSegment Point="0,6"/>
+										<LineSegment Point="5,12"/>
+										<LineSegment Point="10,12"/>
+									</PathFigure>
+									<PathFigure StartPoint="5,0" IsClosed="True">
+										<LineSegment Point="10,6"/>
+										<LineSegment Point="10,0"/>
+									</PathFigure>
+								</PathGeometry>
+							</GeometryDrawing.Geometry>
+						</GeometryDrawing>
+					</DrawingGroup.Children>
+				</DrawingGroup>
+			</DrawingBrush.Drawing>
+		</DrawingBrush>
+	</Window.Resources>
+
 	<StackPanel>
-		<Button Content="Browse" Width="180"
+		<Button Content="Browse" Width="160"
 				Click="Browse_Click"/>
-		<Grid Width="180" Height="120" HorizontalAlignment="Center"
-			  Background="Green">
+		<Grid x:Name="ThumbnailGrid"
+			  Width="160" Height="120" HorizontalAlignment="Center"
+			  Background="{StaticResource StripeBrush}">
 			<Image x:Name="TargetThumbnailImage"
-				   Width="180" Height="120"/>
+				   Width="160" Height="120"/>
 		</Grid>
-		<Grid MinWidth="180" MinHeight="120" HorizontalAlignment="Center"
+		<Grid MinWidth="160" MinHeight="120" HorizontalAlignment="Center"
 			  Margin="0,8,0,0"
 			  Background="Green">
 			<Image x:Name="TargetPreviewImage"/>
